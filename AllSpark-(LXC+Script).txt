@@ -5,9 +5,6 @@ sudo apt install lxc lxc-templates bridge-utils
 # agrego el script, con el nombre sin extension para añadirlo como comando
 cd /usr/bin/
 vim kiribako
-
-# doy permisos
-chmod +x KIRIBAKO.sh
 ----------------------------------------------------------------------------
 #!/bin/bash
 
@@ -98,6 +95,9 @@ while true; do
     mostrar_menu
 done
 ----------------------------------------------------------------------------
+
+# doy permisos
+chmod +x kiribako
 
 # compruebo que puedo acceder al comando de manera global
 command -v kiribako
