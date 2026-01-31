@@ -3,14 +3,17 @@ apt update && apt upgrade -y
 
 # instalar paquetes principales
 apt install -y \
-    nmap tcpdump lm_sensors\
+    nmap tcpdump \
     iputils-ping lm-sensors iproute2 sudo vim iproute2 curl btop iftop lsof \
     lsb-release wget sysstat snmp snmpd tcpdump \
     ngrep iptraf-ng plocate tar gzip tree ca-certificates \
     screen man-db mailutils dnsutils rsyslog locales snmp snmpd smartmontools
 
+apt install lm-sensors -y
+
 # cambiar host
 vim /etc/hostname
+vim /etc/hosts
 
 # Configuro .bashrc (técnica/grisácea)
 vim ~/.bashrc
