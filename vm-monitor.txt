@@ -1,0 +1,156 @@
+apt install postfix
+  > Internet site
+  > vm-monitor
+
+vim /etc/postfix/main.cf
+--------------------------------------------------------------------------
+# Nombre del host y dominios locales
+myhostname = autoscript.local
+myorigin = /etc/mailname
+mydestination = localhost
+
+# Relay a Gmail
+relayhost = [smtp.gmail.com]:587
+
+# TLS
+smtp_use_tls = yes
+smtp_tls_security_level = encrypt
+smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
+
+# Autenticación SASL
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+smtp_sasl_mechanism_filter = plain, login
+
+# Forzar IPv4 (opcional, evita errores de conexión IPv6)
+smtp_address_preference = ipv4
+--------------------------------------------------------------------------
+
+vim /etc/postfix/sasl_passwd
+--------------------------------------------------------------------------
+[smtp.gmail.com]:587 de@gmail.com:<contraseña-de-aplicación>
+--------------------------------------------------------------------------
+
+# Compilar y proteger credenciales
+postmap /etc/postfix/sasl_passwd
+chmod 600 /etc/postfix/sasl_passwd /etc/postfix/sasl_passwd.db
+
+# instalar paquete
+apt install libsasl2-modules -y
+
+# Reiniciar Postfix
+systemctl restart postfix
+systemctl enable postfix
+
+# prueba local
+echo "Prueba de Gmail vía Postfix" | sendmail -v -f de@gmail.com a@gmail.com -t
+
+cd /etc/monitor
+vim monitor.sh
+--------------------------------------------------------------------------
+#!/bin/bash
+
+### === CONFIGURACIÓN DE IPs === ###
+declare -A IP_MAP=(
+    ["192.168.1.1"]="ROUTER-DIGI"
+    ["192.168.1.75"]="PROXMOX"
+    ["192.168.1.129"]="TV-SALÓN"
+    ["192.168.1.130"]="PC-MILITAR-WIFI"
+    ["192.168.1.131"]="PORTATIL-AIR"
+    ["192.168.1.134"]="ANDROID"
+    ["192.168.1.136"]="TV-HABITACIÓN"
+    ["192.168.1.137"]="IPHONE"
+)
+
+STATUS_FILE="/var/lib/aptelliot/ip_status.txt"
+LOG_FILE="/var/log/monitor.log"
+
+### === CONFIGURACIÓN DEL CORREO === ###
+GMAIL_USER="de@gmail.com"
+DESTINO="a@gmail.com"
+ASUNTO="🪖📩  Cambio de estado de IP"
+REMITENTE="no-reply@autoscript.local"
+
+# Inicializar archivos
+mkdir -p /var/lib/aptelliot
+touch "$STATUS_FILE" "$LOG_FILE"
+
+### === FUNCIONES === ###
+
+send_email() {
+    local ip=$1
+    local name=$2
+    local state=$3
+
+    (
+        echo "Subject: $ASUNTO"
+        echo "From: $REMITENTE"
+        echo "To: $DESTINO"
+        echo "Content-Type: text/plain; charset=utf-8"
+        echo
+        echo "El dispositivo '$name' (IP: $ip) cambió a estado: $state"
+    ) | sendmail -v -f "$REMITENTE" -t >> "$LOG_FILE" 2>&1
+
+    echo "$(date '+%F %T') - Intento de envío: $name ($ip) -> $state" >> "$LOG_FILE"
+}
+
+### === COMPROBACIÓN DE IPs === ###
+for ip in "${!IP_MAP[@]}"; do
+    if ping -c 1 -W 1 "$ip" &>/dev/null; then
+        current_status="UP"
+    else
+        current_status="DOWN"
+    fi
+
+    previous_status=$(grep "^$ip " "$STATUS_FILE" | awk '{print $2}')
+
+    echo "$(date '+%F %T') - Ping $ip (${IP_MAP[$ip]}): $current_status" >> "$LOG_FILE"
+
+    # Enviar correo si cambia el estado o si es la primera vez (previous_status vacío)
+    if [ "$previous_status" != "$current_status" ] || [ -z "$previous_status" ]; then
+        send_email "$ip" "${IP_MAP[$ip]}" "$current_status"
+
+        # Actualizar estado en el archivo
+        tmp=$(mktemp)
+        grep -v "^$ip " "$STATUS_FILE" > "$tmp"
+        echo "$ip $current_status" >> "$tmp"
+        mv "$tmp" "$STATUS_FILE"
+
+        echo "$(date '+%F %T') - Estado actualizado: $ip -> $current_status" >> "$LOG_FILE"
+    fi
+done
+--------------------------------------------------------------------------
+
+chmod +x monitor.sh
+
+# creo un servicio
+vim /etc/systemd/system/monitor.service
+---------------------------------------------
+[Unit]
+Description=Monitor de IPs y envío de alertas por correo
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/aptelliot/monitor.sh
+Restart=always
+
+# Ejecuta el script cada 60 segundos tras fallo/restart
+RestartSec=60
+
+# Ejecutar como root (puedes cambiarlo si tienes un usuario dedicado)
+User=root
+
+#Environment=MSMTP_CONFIG=/etc/msmtprc
+
+[Install]
+WantedBy=multi-user.target
+---------------------------------------------
+
+# activo el servicio
+systemctl daemon-reload
+systemctl enable monitor.service
+systemctl start monitor.service
+systemctl status monitor.service
+  
