@@ -245,22 +245,39 @@ systemctl restart iptables
 # Reiniciar sistema
 exec bash
 
-# defino una ip estática para la máquina desde el servidor principal
-vim /var/lib/lxc/vm-qbitorrent/config
+# defino una única ip estática para la máquina (dentro de la máquina nueva)
+vim /etc/systemd/network/eth0.network
 ----------------------------------------------------------------
-...
-# IP estática
-lxc.net.0.ipv4.address = 192.168.1.101/24
-lxc.net.0.ipv4.gateway = 192.168.1.1
-lxc.net.0.ipv4.dhcp = 0
+[Match]
+Name=eth0
+
+[Network]
+DHCP=false
+Address=192.168.1.101/24
+Gateway=192.168.1.1
+DNS=1.1.1.1
+
+[DHCPv4]
+UseDomains=true
+UseMTU=true
+
+#[DHCP]
+#ClientIdentifier=mac
 ----------------------------------------------------------------
 
-# paro e inicializo la máquina de nuevo y ya tendra lanueva ip
+# reinicio servicio 
+systemctl restart systemd-networkd
+reboot
+
+# paro e inicializo la máquina de nuevo y ya tendra la nueva ip estática
 kiribako
 4
 vm-qbitorrent
 2
 vm-qbitorrent
+3
+vm-qbitorrent
 
-
+# compruebo ip
+ip a
 
