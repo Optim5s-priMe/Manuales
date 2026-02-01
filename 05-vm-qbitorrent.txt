@@ -125,7 +125,3 @@ systemctl status qbittorrent-nox
 
 
 
-==========================================================================================
-# sitios donde descargar torrents
-https://www1.subtorrents.zip/
-https://www.justwatch.com/in
