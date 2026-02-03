@@ -1,3 +1,5 @@
+# máquina minimalista para un monitor simple casero (porque no necesito nada más...), de pings y alarmas a gmail.
+
 apt install postfix
   > Internet site
   > vm-monitor
